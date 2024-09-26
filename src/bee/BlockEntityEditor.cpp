@@ -16,6 +16,8 @@
 #include "mc/dataloadhelper/DefaultDataLoadHelper.h"
 #include "mc/nbt/CompoundTag.h"
 #include "mc/nbt/CompoundTagVariant.h"
+#include "mc/server/commands/CommandBlockName.h"
+#include "mc/server/commands/CommandBlockNameResult.h"
 #include "mc/server/commands/CommandOrigin.h"
 #include "mc/server/commands/CommandOutput.h"
 #include "mc/server/commands/CommandPermissionLevel.h"
@@ -114,7 +116,7 @@ bool BlockEntityEditor::enable() {
         .runtimeOverload()
         .required("pos", ll::command::ParamKind::BlockPos)
         .required("path", ll::command::ParamKind::String)
-        .required("value", ll::command::ParamKind::String)
+        .required("value", ll::command::ParamKind::RawText)
         .execute([](CommandOrigin const& origin, CommandOutput& output, ll::command::RuntimeCommand const& self) {
             auto* entity = origin.getEntity();
             if (entity == nullptr || !entity->isType(ActorType::Player))
@@ -130,13 +132,45 @@ bool BlockEntityEditor::enable() {
             auto newtag = editNbtFromTag(
                 std::move(tag),
                 self["path"].get<ll::command::ParamKind::String>(),
-                self["value"].get<ll::command::ParamKind::String>()
+                self["value"].get<ll::command::ParamKind::RawText>().getText()
             );
             if (newtag.has_value()) {
                 // output.success(newtag->toSnbt(SnbtFormat::PrettyChatPrint));
                 be->load(player->getLevel(), newtag.value(), *helper);
                 return output.success("Success.");
             } else return output.error("Error.");
+        });
+    ll::command::CommandRegistrar::getInstance()
+        .getOrCreateCommand("bec", "BlockEntity Creator", CommandPermissionLevel::GameDirectors)
+        .runtimeOverload()
+        .required("pos", ll::command::ParamKind::BlockPos)
+        .required("block", ll::command::ParamKind::BlockName)
+        .required("state", ll::command::ParamKind::BlockState)
+        .required("value", ll::command::ParamKind::RawText)
+        .execute([](CommandOrigin const& origin, CommandOutput& output, ll::command::RuntimeCommand const& self) {
+            auto* entity = origin.getEntity();
+            if (entity == nullptr || !entity->isType(ActorType::Player))
+                return output.error("Only players can run this command");
+            auto* player = static_cast<Player*>(entity);
+            auto& bs     = player->getDimensionBlockSource();
+            auto  be     = BlockActor::create(
+                CompoundTag::fromSnbt(self["value"].get<ll::command::ParamKind::RawText>().getText()).value(),
+                self["pos"].get<ll::command::ParamKind::BlockPos>().getBlockPos(player->getFeetBlockPos())
+            );
+            if (!be) return output.error("Bad BlockEntity");
+            auto* b = self["block"]
+                          .get<ll::command::ParamKind::BlockName>()
+                          .resolveBlock(self["state"].get<ll::command::ParamKind::BlockState>(), output)
+                          .getBlock();
+            if (!b) return output.error("Bad Block");
+            bs.setBlock(
+                self["pos"].get<ll::command::ParamKind::BlockPos>().getBlockPos(player->getFeetBlockPos()),
+                *b,
+                3,
+                be,
+                nullptr,
+                nullptr
+            );
         });
     return true;
 }
