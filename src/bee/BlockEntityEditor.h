@@ -2,14 +2,14 @@
 
 #include "ll/api/mod/NativeMod.h"
 
-namespace my_mod {
+namespace bee {
 
-class MyMod {
+class BlockEntityEditor {
 
 public:
-    static MyMod& getInstance();
+    static BlockEntityEditor& getInstance();
 
-    MyMod(ll::mod::NativeMod& self) : mSelf(self) {}
+    BlockEntityEditor(ll::mod::NativeMod& self) : mSelf(self) {}
 
     [[nodiscard]] ll::mod::NativeMod& getSelf() const { return mSelf; }
 
@@ -30,4 +30,4 @@ private:
     ll::mod::NativeMod& mSelf;
 };
 
-} // namespace my_mod
+} // namespace bee
